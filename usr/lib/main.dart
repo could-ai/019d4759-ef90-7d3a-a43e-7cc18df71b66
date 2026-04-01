@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 void main() {
   runApp(const PresentationApp());
@@ -50,6 +53,7 @@ class PresentationScreen extends StatefulWidget {
 class _PresentationScreenState extends State<PresentationScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  bool _isDownloading = false;
 
   final List<SlideData> _slides = [
     SlideData(
@@ -181,6 +185,96 @@ class _PresentationScreenState extends State<PresentationScreen> {
     }
   }
 
+  Future<void> _downloadPresentation() async {
+    setState(() {
+      _isDownloading = true;
+    });
+
+    try {
+      final pdf = pw.Document();
+
+      for (int i = 0; i < _slides.length; i++) {
+        final slide = _slides[i];
+        pdf.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.presentation,
+            build: (pw.Context context) {
+              return pw.Container(
+                padding: const pw.EdgeInsets.all(40),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      slide.title,
+                      style: pw.TextStyle(
+                        fontSize: i == 0 ? 48 : 36,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.blue900,
+                      ),
+                    ),
+                    pw.SizedBox(height: 20),
+                    pw.Divider(thickness: 2, color: PdfColors.grey400),
+                    pw.SizedBox(height: 30),
+                    pw.Expanded(
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: slide.bulletPoints.map((point) {
+                          return pw.Padding(
+                            padding: const pw.EdgeInsets.only(bottom: 20),
+                            child: pw.Row(
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              children: [
+                                pw.Container(
+                                  margin: const pw.EdgeInsets.only(top: 10, right: 16),
+                                  width: 10,
+                                  height: 10,
+                                  decoration: const pw.BoxDecoration(
+                                    shape: pw.BoxShape.circle,
+                                    color: PdfColors.blueGrey,
+                                  ),
+                                ),
+                                pw.Expanded(
+                                  child: pw.Text(
+                                    point,
+                                    style: pw.TextStyle(
+                                      fontSize: i == 0 ? 28 : 24,
+                                      lineSpacing: 5,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    // Footer
+                    pw.Align(
+                      alignment: pw.Alignment.bottomRight,
+                      child: pw.Text(
+                        'Slide ${i + 1} of ${_slides.length}',
+                        style: const pw.TextStyle(fontSize: 14, color: PdfColors.grey),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      }
+
+      await Printing.sharePdf(
+        bytes: await pdf.save(),
+        filename: 'Sessions_Court_Internship_Presentation.pdf',
+      );
+    } finally {
+      setState(() {
+        _isDownloading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -200,6 +294,27 @@ class _PresentationScreenState extends State<PresentationScreen> {
               ),
             ),
           ),
+          if (_isDownloading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.download),
+              tooltip: 'Download Presentation (PDF)',
+              onPressed: _downloadPresentation,
+            ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(
